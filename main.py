@@ -80,6 +80,13 @@ async def on_ready():
     load_bank()
     start_file_watcher()
 
+    # Cog asynchron laden mit try-Block
+    try:
+        await bot.load_extension('casino')
+        print("🎰 Casino-Cog erfolgreich geladen!")
+    except Exception as e:
+        print(f"❌ Fehler beim Laden des Casino-Cogs: {e}")
+
 @bot.command()
 async def balance(ctx):
     user_id = str(ctx.author.id)
@@ -136,13 +143,6 @@ async def goldhistory(ctx):
 async def ping(ctx):
     await ctx.send("🏓 Pong!")
 
-# --- Extension laden ---
-try:
-    bot.load_extension('casino')
-    print("🎰 Casino-Cog erfolgreich geladen")
-except Exception as e:
-    print(f"❌ Fehler beim Laden des Casino-Cogs: {e}")
-
 # --- Token laden & Bot starten ---
 token = os.getenv('DISCORD_TOKEN')
 if not token:
@@ -150,5 +150,6 @@ if not token:
     exit(1)
 
 bot.run(token)
+
 
 
