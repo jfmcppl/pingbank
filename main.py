@@ -149,5 +149,6 @@ if not token:
     print("❌ DISCORD_TOKEN nicht gefunden! Bitte füge deinen Token in den Secrets hinzu.")
     exit(1)
 
+
 bot.run(token)
 
