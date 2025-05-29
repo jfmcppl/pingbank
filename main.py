@@ -136,7 +136,7 @@ async def goldhistory(ctx):
 async def ping(ctx):
     await ctx.send("🏓 Pong!")
 
-# --- Casino-Cog laden ---
+# --- Casino Cog laden (SYNCHRON, vor bot.run()) ---
 try:
     bot.load_extension('casino')
     print("🎰 Casino-Cog erfolgreich geladen!")
@@ -150,6 +150,4 @@ if not token:
     exit(1)
 
 bot.run(token)
-
-
 
