@@ -137,7 +137,11 @@ async def ping(ctx):
     await ctx.send("🏓 Pong!")
 
 # --- Extension laden ---
-bot.load_extension('casino')
+try:
+    bot.load_extension('casino')
+    print("🎰 Casino-Cog erfolgreich geladen")
+except Exception as e:
+    print(f"❌ Fehler beim Laden des Casino-Cogs: {e}")
 
 # --- Token laden & Bot starten ---
 token = os.getenv('DISCORD_TOKEN')
