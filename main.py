@@ -8,7 +8,7 @@ import time
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 
-# Webserver-Setup für UptimeRobot
+# --- Webserver-Setup für UptimeRobot ---
 app = Flask('')
 
 @app.route('/')
@@ -24,13 +24,15 @@ def keep_alive():
 
 keep_alive()
 
-# Intents aktivieren, damit der Bot Nachrichten lesen und Mitglieder-Daten bekommt
+# --- Intents aktivieren ---
 intents = discord.Intents.default()
 intents.message_content = True
 intents.members = True
 
+# --- Bot initialisieren ---
 bot = commands.Bot(command_prefix='!', intents=intents)
 
+# --- Bank-Datei & Daten ---
 BANK_FILE = 'bank.json'
 bank_data = {}
 
@@ -54,6 +56,7 @@ def save_bank(data):
     with open(BANK_FILE, 'w', encoding='utf-8') as f:
         json.dump(data, f, indent=4)
 
+# --- Dateiüberwachung für bank.json ---
 class BankFileHandler(FileSystemEventHandler):
     def on_modified(self, event):
         if event.src_path.endswith('bank.json') and not event.is_directory:
@@ -70,6 +73,7 @@ def start_file_watcher():
     print("👀 Datei-Überwachung für bank.json gestartet")
     return observer
 
+# --- Events & Commands ---
 @bot.event
 async def on_ready():
     print(f'🤖 Die Pingwinsche Staatsbank ist online als {bot.user}')
@@ -126,18 +130,21 @@ async def goldhistory(ctx):
 
     await ctx.author.send(file=discord.File(filename))
     await ctx.message.delete()
-
-    import os
     os.remove(filename)
 
 @bot.command()
 async def ping(ctx):
     await ctx.send("🏓 Pong!")
 
+# --- Extension laden ---
+bot.load_extension('casino')
+
+# --- Token laden & Bot starten ---
 token = os.getenv('DISCORD_TOKEN')
 if not token:
     print("❌ DISCORD_TOKEN nicht gefunden! Bitte füge deinen Token in den Secrets hinzu.")
     exit(1)
 
 bot.run(token)
+
 
