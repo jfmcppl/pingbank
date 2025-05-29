@@ -1,5 +1,6 @@
 import discord
 from discord.ext import commands
+import random
 import json
 import os
 from flask import Flask
@@ -73,6 +74,19 @@ def start_file_watcher():
     print("👀 Datei-Überwachung für bank.json gestartet")
     return observer
 
+# --- Bank-Hilfsfunktionen ---
+def get_user_gold(user_id):
+    entries = bank_data.get(user_id, [])
+    if isinstance(entries, list):
+        return sum(entry.get("betrag", 0) for entry in entries)
+    return 0
+
+def update_user_gold(user_id, amount, reason):
+    if user_id not in bank_data:
+        bank_data[user_id] = []
+    bank_data[user_id].append({"betrag": amount, "grund": reason})
+    save_bank(bank_data)
+
 # --- Events & Commands ---
 @bot.event
 async def on_ready():
@@ -84,11 +98,7 @@ async def on_ready():
 async def balance(ctx):
     user_id = str(ctx.author.id)
     load_bank()
-    gold_entries = bank_data.get(user_id, [])
-    if isinstance(gold_entries, list):
-        total_gold = sum(entry.get("betrag", 0) for entry in gold_entries)
-    else:
-        total_gold = 0
+    total_gold = get_user_gold(user_id)
     try:
         await ctx.author.send(f'{ctx.author.name}, dein Kontostand beträgt {total_gold} Gold.')
         await ctx.message.delete()
@@ -100,10 +110,7 @@ async def balance(ctx):
 async def addgold(ctx, member: discord.Member, amount: int, *, grund: str = "Manuelle Änderung"):
     user_id = str(member.id)
     load_bank()
-    if user_id not in bank_data:
-        bank_data[user_id] = []
-    bank_data[user_id].append({"betrag": amount, "grund": grund})
-    save_bank(bank_data)
+    update_user_gold(user_id, amount, grund)
     await ctx.send(f'{amount} Gold wurde dem Konto von {member.display_name} gutgeschrieben. Grund: {grund}')
 
 @bot.command()
@@ -136,19 +143,125 @@ async def goldhistory(ctx):
 async def ping(ctx):
     await ctx.send("🏓 Pong!")
 
-# --- Casino Cog laden (SYNCHRON, vor bot.run()) ---
-try:
-    bot.load_extension('casino')
-    print("🎰 Casino-Cog erfolgreich geladen!")
-except Exception as e:
-    print(f"❌ Fehler beim Laden des Casino-Cogs: {e}")
+# --- Casino Commands direkt in main.py ---
+
+@bot.command()
+async def coinflip(ctx, bet: int):
+    user_id = str(ctx.author.id)
+    load_bank()
+    gold = get_user_gold(user_id)
+
+    if bet <= 0:
+        await ctx.send("Bitte setze einen positiven Betrag!")
+        return
+    if bet > gold:
+        await ctx.send("Du hast nicht genug Gold!")
+        return
+
+    result = random.choice(["Kopf", "Zahl"])
+    winner_side = random.choice(["Kopf", "Zahl"])
+
+    if result == winner_side:
+        update_user_gold(user_id, bet, "Gewinn beim Coinflip")
+        await ctx.send(f"🎉 Du hast gewonnen! Dein Gewinn: {bet} Gold.")
+    else:
+        update_user_gold(user_id, -bet, "Verlust beim Coinflip")
+        await ctx.send(f"😢 Du hast verloren und {bet} Gold verloren.")
+
+@bot.command()
+async def slotmachine(ctx, bet: int):
+    user_id = str(ctx.author.id)
+    load_bank()
+    gold = get_user_gold(user_id)
+
+    if bet <= 0:
+        await ctx.send("Bitte setze einen positiven Betrag!")
+        return
+    if bet > gold:
+        await ctx.send("Du hast nicht genug Gold!")
+        return
+
+    slots = ['🍒', '🍋', '🍊', '🍉', '⭐', '💎']
+    result = [random.choice(slots) for _ in range(3)]
+
+    await ctx.send(f"🎰 Ergebnis: {' | '.join(result)}")
+
+    if result[0] == result[1] == result[2]:
+        payout = bet * 5
+        update_user_gold(user_id, payout, "Gewinn bei Slotmachine (Dreier)")
+        await ctx.send(f"🎉 Jackpot! Du gewinnst {payout} Gold!")
+    elif result[0] == result[1] or result[1] == result[2] or result[0] == result[2]:
+        payout = bet * 2
+        update_user_gold(user_id, payout, "Gewinn bei Slotmachine (Zweier)")
+        await ctx.send(f"🎉 Du hast zwei Symbole gleich! Gewinn: {payout} Gold.")
+    else:
+        update_user_gold(user_id, -bet, "Verlust bei Slotmachine")
+        await ctx.send(f"Leider kein Gewinn. Du verlierst {bet} Gold.")
+
+@bot.command()
+async def blackjack(ctx, bet: int):
+    user_id = str(ctx.author.id)
+    load_bank()
+    gold = get_user_gold(user_id)
+
+    if bet <= 0:
+        await ctx.send("Bitte setze einen positiven Betrag!")
+        return
+    if bet > gold:
+        await ctx.send("Du hast nicht genug Gold!")
+        return
+
+    def card_value(card):
+        if card in ['J', 'Q', 'K']:
+            return 10
+        elif card == 'A':
+            return 11
+        else:
+            return int(card)
+
+    def hand_value(hand):
+        value = sum(card_value(card) for card in hand)
+        aces = hand.count('A')
+        while value > 21 and aces:
+            value -= 10
+            aces -= 1
+        return value
+
+    deck = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'] * 4
+    random.shuffle(deck)
+
+    player_hand = [deck.pop(), deck.pop()]
+    dealer_hand = [deck.pop(), deck.pop()]
+
+    def format_hand(hand):
+        return ', '.join(hand)
+
+    while hand_value(player_hand) < 17:
+        player_hand.append(deck.pop())
+
+    player_total = hand_value(player_hand)
+    dealer_total = hand_value(dealer_hand)
+
+    await ctx.send(f"🃏 Deine Karten: {format_hand(player_hand)} (Wert: {player_total})")
+    await ctx.send(f"🃏 Dealer-Karten: {format_hand(dealer_hand)} (Wert: {dealer_total})")
+
+    if player_total > 21:
+        update_user_gold(user_id, -bet, "Verlust bei Blackjack (Bust)")
+        await ctx.send(f"Du hast dich überkauft und verloren! {bet} Gold wurden abgezogen.")
+    elif dealer_total > 21 or player_total > dealer_total:
+        update_user_gold(user_id, bet, "Gewinn bei Blackjack")
+        await ctx.send(f"Glückwunsch, du hast gewonnen! {bet} Gold gutgeschrieben.")
+    elif player_total == dealer_total:
+        await ctx.send("Unentschieden! Dein Einsatz wird zurückerstattet.")
+    else:
+        update_user_gold(user_id, -bet, "Verlust bei Blackjack")
+        await ctx.send(f"Der Dealer gewinnt. Du verlierst {bet} Gold.")
 
 # --- Token laden & Bot starten ---
 token = os.getenv('DISCORD_TOKEN')
 if not token:
     print("❌ DISCORD_TOKEN nicht gefunden! Bitte füge deinen Token in den Secrets hinzu.")
     exit(1)
-
 
 bot.run(token)
 
