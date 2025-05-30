@@ -146,7 +146,7 @@ async def ping(ctx):
 # --- Casino Commands direkt in main.py ---
 
 @bot.command()
-async def coinflip(ctx, bet: int):
+async def coinflip(ctx, bet: int, choice: str = None):
     user_id = str(ctx.author.id)
     load_bank()
     gold = get_user_gold(user_id)
@@ -157,11 +157,21 @@ async def coinflip(ctx, bet: int):
     if bet > gold:
         await ctx.send("Du hast nicht genug Gold!")
         return
+    
+    if choice is None:
+        await ctx.send("Bitte wähle Kopf oder Zahl! Beispiel: `!coinflip 100 Kopf`")
+        return
+    
+    choice = choice.lower()
+    if choice not in ["kopf", "zahl"]:
+        await ctx.send("Bitte wähle 'Kopf' oder 'Zahl'!")
+        return
 
-    result = random.choice(["Kopf", "Zahl"])
-    winner_side = random.choice(["Kopf", "Zahl"])
+    result = random.choice(["kopf", "zahl"])
+    
+    await ctx.send(f"🪙 Die Münze zeigt: **{result.capitalize()}**")
 
-    if result == winner_side:
+    if result == choice:
         update_user_gold(user_id, bet, "Gewinn beim Coinflip")
         await ctx.send(f"🎉 Du hast gewonnen! Dein Gewinn: {bet} Gold.")
     else:
@@ -227,35 +237,63 @@ async def blackjack(ctx, bet: int):
             aces -= 1
         return value
 
+    def format_hand(hand):
+        return ', '.join(hand)
+
     deck = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'] * 4
     random.shuffle(deck)
 
     player_hand = [deck.pop(), deck.pop()]
     dealer_hand = [deck.pop(), deck.pop()]
 
-    def format_hand(hand):
-        return ', '.join(hand)
+    # Zeige initiale Karten
+    await ctx.send(f"🃏 Deine Karten: {format_hand(player_hand)} (Wert: {hand_value(player_hand)})")
+    await ctx.send(f"🃏 Dealer zeigt: {dealer_hand[0]} und eine verdeckte Karte")
 
+    # Prüfe auf Blackjack
+    if hand_value(player_hand) == 21:
+        if hand_value(dealer_hand) == 21:
+            await ctx.send("🃏 Beide haben Blackjack! Unentschieden.")
+            return
+        else:
+            update_user_gold(user_id, int(bet * 1.5), "Blackjack Gewinn")
+            await ctx.send(f"🎉 Blackjack! Du gewinnst {int(bet * 1.5)} Gold!")
+            return
+
+    # Spieler ist dran - automatische Strategie (vereinfacht)
     while hand_value(player_hand) < 17:
         player_hand.append(deck.pop())
+        await ctx.send(f"🃏 Du ziehst: {player_hand[-1]} | Deine Karten: {format_hand(player_hand)} (Wert: {hand_value(player_hand)})")
 
     player_total = hand_value(player_hand)
-    dealer_total = hand_value(dealer_hand)
 
-    await ctx.send(f"🃏 Deine Karten: {format_hand(player_hand)} (Wert: {player_total})")
-    await ctx.send(f"🃏 Dealer-Karten: {format_hand(dealer_hand)} (Wert: {dealer_total})")
-
+    # Prüfe ob Spieler überkauft hat
     if player_total > 21:
         update_user_gold(user_id, -bet, "Verlust bei Blackjack (Bust)")
-        await ctx.send(f"Du hast dich überkauft und verloren! {bet} Gold wurden abgezogen.")
-    elif dealer_total > 21 or player_total > dealer_total:
+        await ctx.send(f"💥 Du hast dich überkauft! Du verlierst {bet} Gold.")
+        return
+
+    # Dealer ist dran
+    await ctx.send(f"🃏 Dealer deckt auf: {format_hand(dealer_hand)} (Wert: {hand_value(dealer_hand)})")
+
+    while hand_value(dealer_hand) < 17:
+        dealer_hand.append(deck.pop())
+        await ctx.send(f"🃏 Dealer zieht: {dealer_hand[-1]} | Dealer Karten: {format_hand(dealer_hand)} (Wert: {hand_value(dealer_hand)})")
+
+    dealer_total = hand_value(dealer_hand)
+
+    # Bestimme Gewinner
+    if dealer_total > 21:
+        update_user_gold(user_id, bet, "Gewinn bei Blackjack (Dealer Bust)")
+        await ctx.send(f"🎉 Dealer hat sich überkauft! Du gewinnst {bet} Gold!")
+    elif player_total > dealer_total:
         update_user_gold(user_id, bet, "Gewinn bei Blackjack")
-        await ctx.send(f"Glückwunsch, du hast gewonnen! {bet} Gold gutgeschrieben.")
+        await ctx.send(f"🎉 Du gewinnst! Du bekommst {bet} Gold!")
     elif player_total == dealer_total:
-        await ctx.send("Unentschieden! Dein Einsatz wird zurückerstattet.")
+        await ctx.send("🤝 Unentschieden! Dein Einsatz wird zurückerstattet.")
     else:
         update_user_gold(user_id, -bet, "Verlust bei Blackjack")
-        await ctx.send(f"Der Dealer gewinnt. Du verlierst {bet} Gold.")
+        await ctx.send(f"😞 Dealer gewinnt. Du verlierst {bet} Gold.")
 
 # --- Token laden & Bot starten ---
 token = os.getenv('DISCORD_TOKEN')
@@ -264,4 +302,3 @@ if not token:
     exit(1)
 
 bot.run(token)
-
