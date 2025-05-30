@@ -72,8 +72,8 @@ async def balance(ctx):
     await ctx.send(f"{ctx.author.mention}, dein Kontostand beträgt {gold} Gold.")
 
 @bot.command()
-async def coinflip(ctx, bet: int, choice: str = None):
-    print("🎲 Coinflip wurde aufgerufen")
+async def werfen(ctx, bet: int, choice: str = None):
+    print("🎲 Würfen wurde aufgerufen")
     user_id = str(ctx.author.id)
     gold = get_user_gold(user_id)
 
@@ -84,7 +84,7 @@ async def coinflip(ctx, bet: int, choice: str = None):
         await ctx.send("Du hast nicht genug Gold.")
         return
     if choice is None:
-        await ctx.send("Bitte wähle Kopf oder Zahl. Beispiel: `!coinflip 100 Kopf`")
+        await ctx.send("Bitte wähle Kopf oder Zahl. Beispiel: `!werfen 100 Kopf`")
         return
 
     choice = choice.lower()
@@ -96,10 +96,10 @@ async def coinflip(ctx, bet: int, choice: str = None):
     await ctx.send(f"🪙 Die Münze zeigt: **{result.capitalize()}**")
 
     if result == choice:
-        update_user_gold(user_id, bet, "Coinflip Gewinn")
+        update_user_gold(user_id, bet, "Würfen Gewinn")
         await ctx.send(f"🎉 Du hast gewonnen! Gewinn: {bet} Gold.")
     else:
-        update_user_gold(user_id, -bet, "Coinflip Verlust")
+        update_user_gold(user_id, -bet, "Würfen Verlust")
         await ctx.send(f"😢 Du hast verloren und {bet} Gold verloren.")
 
 # --- Bot starten ---
@@ -109,3 +109,4 @@ if not token:
     exit(1)
 
 bot.run(token)
+
